@@ -1,2 +1,0 @@
-wxPython>=4.2.0
-pyinstaller>=5.13.0
