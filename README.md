@@ -27,10 +27,9 @@
 
 ## Installation
 
-git clone https://github.com/yourusername/PyUInstaller.git
-cd PyUInstaller
-pip install -r requirements.txt  # Optional if you add one
-python PyUInstaller.py
+- clone git repo to folder using: https://github.com/0r4cl3MySQL/PyUInstaller.git
+- run in **cmd** pip install -r requirements.txt
+- run in **cmd** python PyUInstaller.py
 
 ---
 
