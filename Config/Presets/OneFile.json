@@ -1,0 +1,19 @@
+{
+    "script_path": "",
+    "icon_path": "",
+    "extra_path": "",
+    "output_path": "",
+    "hidden_imports": "",
+    "add_data": "",
+    "spec_path": "",
+    "onedir": false,
+    "onefile": true,
+    "noconsole": true,
+    "clean-build": true,
+    "confirm-overwrite": false,
+    "debug": false,
+    "strip-bin": true,
+    "no-upx": false,
+    "no-cache": false,
+    "use-spec": false
+}
