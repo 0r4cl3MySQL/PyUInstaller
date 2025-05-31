@@ -6,7 +6,7 @@
 
 - Easy selection of script, icon, and output folder
 - Full support for additional scripts, hidden imports and data files
-- Option to use `.spec` files instead of .py
+- Option to use `.spec` files instead of .py with built-in SpecFile Creator
 - Command preview panel for transparency
 - Build configuration presets (save/load)
 - Auto-save session support
@@ -65,6 +65,20 @@ PyInstaller Flags	Description in app:
 - Strip Binaries	`--strip` Reduce binary size
 - No UPX	`--noupx` Disable UPX compression
 - Force No-Cache	`--no-cache` Skip caching compiled bytecode
+
+## Spec File Creator (Advanced)
+Need full control? Use the Spec File Creator:
+
+Open it from the main window
+
+Fill in:
+
+- Script path, app name, icon path
+- Hidden imports, binaries, data, excludes, etc.
+- Get a live preview of the .spec content
+- Save the spec file to any location
+- Return to the main UI and toggle "Use .spec file" to build using it
+- This gives you full power over PyInstaller’s lower-level configurations.
 
 ---
 
