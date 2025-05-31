@@ -18,7 +18,7 @@ class MainFrame ( wx.Frame ):
                           size=wx.Size(500, 800), style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL)
 
         # Main Sizer setup
-        self.SetSizeHints(wx.DefaultSize, wx.DefaultSize)
+        self.SetSizeHints( wx.Size( 500,800 ), wx.Size( 500,800 ) )
 
         # Variables declaration
         self.ConfigDir = pathlib.Path("Config")                 # Config Dir
@@ -31,6 +31,9 @@ class MainFrame ( wx.Frame ):
         self.IconDir = self.ScriptDir / "Icon"                  # Icon Dir
         self.OutputDir = self.BaseDir / "Compile"               # Compile Dir
         self.SpecDir = self.ScriptDir / "Spec"                  # Spec Dir
+
+        # SpecFile creator Frame variable declaration
+        self.spec_creator = None
 
         # Presets variable declaration
         self.Presets = None
@@ -48,6 +51,7 @@ class MainFrame ( wx.Frame ):
         self.MI_Quit = wx.MenuItem(self.M_MenuFile, wx.ID_ANY, _(u"Quit") + u"\t" + u"ALT+F4", wx.EmptyString,
                                    wx.ITEM_NORMAL)
         # Quit Bitmap for Quit button
+        # noinspection PyTypeChecker
         self.MI_Quit.SetBitmap(wx.ArtProvider.GetBitmap(wx.ART_QUIT, wx.ART_MENU))
         # Quit SubTab add to Main menu
         self.M_MenuFile.Append(self.MI_Quit)
@@ -73,6 +77,7 @@ class MainFrame ( wx.Frame ):
                                    wx.ITEM_NORMAL)
 
         # Help Bitmap for Help button
+        # noinspection PyTypeChecker
         self.MI_Help.SetBitmap(wx.ArtProvider.GetBitmap(wx.ART_QUESTION, wx.ART_MENU))
         # About Tab add to MainMenu
         self.M_MenuAbout.Append(self.MI_Help)
@@ -549,7 +554,15 @@ class MainFrame ( wx.Frame ):
                                            0)
 
         # ChoiceBox add to HB SpecFile
-        HB_UseSpecPanel.Add(self.ChB_UseSpecFile, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        HB_UseSpecPanel.Add(self.ChB_UseSpecFile, 1, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+
+        # SpecFile creator Button
+        self.Btn_CreateSpecFile = wx.Button( VB_PresetPanel.GetStaticBox(), wx.ID_ANY, _(u"SpecFile Creator"),
+                                             wx.DefaultPosition, wx.DefaultSize, 0 )
+
+        # Button add to SpecFile HB
+        HB_UseSpecPanel.Add( self.Btn_CreateSpecFile, 0, wx.ALL, 5 )
+
 
         # HB add to VB Presets
         VB_PresetPanel.Add(HB_UseSpecPanel, 1, wx.EXPAND, 5)
@@ -659,20 +672,23 @@ class MainFrame ( wx.Frame ):
         # Bind events to Accel table
         self.Bind(wx.EVT_MENU, self.OnClose, id=ID_QUIT)                    # Bind event for Quit
         self.Bind(wx.EVT_MENU, self.ToggleAutoSave, id=ID_AUTOSAVE_TOGGLE)  # Bind event for AutoSave
-        self.Bind(wx.EVT_MENU, self.Help, id=ID_HELP)                    # Bind event for Help
+        self.Bind(wx.EVT_MENU, self.Help, id=ID_HELP)                       # Bind event for Help
         self.Bind(wx.EVT_MENU, self.Compile, id=ID_COMPILE)                 # Bind event for Compile
 
         # Bind the key down event for Backspace
-        self.TxtCTRL_Script.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)   # Event to clean Script file
-        self.TxtCTRL_IconPath.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown) # Event to clean Icon file
-        self.TxtCTRL_SpecFile.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown) # Event to clean Spec file
+        self.TxtCTRL_Script.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)            # Bind event to clean Script file
+        self.TxtCTRL_IconPath.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)          # Bind event to clean Icon file
+        self.TxtCTRL_SpecFile.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)          # Bind event to clean Spec file
 
         # Bind Event for ExtraScript CheckBox
-        self.ChC_UseExtraScript.Bind(wx.EVT_CHECKBOX, self.OnCheckboxToggle)
+        self.ChC_UseExtraScript.Bind(wx.EVT_CHECKBOX, self.OnCheckboxToggle) # Bind event for ExtraScript CheckBox
 
         # Bind menu item events for Quit and Help
-        self.Bind(wx.EVT_MENU, self.OnClose, self.MI_Quit)
-        self.Bind(wx.EVT_MENU, self.Help, self.MI_Help)
+        self.Bind(wx.EVT_MENU, self.OnClose, self.MI_Quit)                   # Bind event for Quit menu button
+        self.Bind(wx.EVT_MENU, self.Help, self.MI_Help)                      # Bind event for Help menu button
+
+        # Bind SpecFile Button to open SpecFile Creator
+        self.Btn_CreateSpecFile.Bind(wx.EVT_BUTTON, self.OnOpenSpecCreator)  # Bind event for
 
     # Handles the checkbox toggle to enable or disable TxtCTRL_ExtraScripts based on selection
     def OnCheckboxToggle(self, event):
@@ -1110,10 +1126,32 @@ class MainFrame ( wx.Frame ):
         # Handle Backspace (WXK_BACK) for read-only text controls
         if FocusedCtrl in (self.TxtCTRL_Script, self.TxtCTRL_IconPath, self.TxtCTRL_SpecFile):
             if KeyCode == wx.WXK_BACK:
+                # noinspection PyUnresolvedReferences
                 FocusedCtrl.Clear()  # Clear the text of the focused read-only TextCtrl
                 return  # Prevent further handling of the key event
 
         event.Skip()  # Allow normal behavior for other controls
+
+    # Open SpecFile Creator Window - Frame
+    def OnOpenSpecCreator(self, event):
+
+        Data = {
+            "script": self.TxtCTRL_Script.GetValue(),
+            "app_name": pathlib.Path(self.TxtCTRL_Script.GetValue()).stem if self.TxtCTRL_Script.GetValue() else "",
+            "icon": self.TxtCTRL_IconPath.GetValue(),
+            "bin_folder": "bin",
+            "console": not self.ChB_NoConsole.GetValue(),
+            "onedir": self.ChB_OneDir.GetValue(),
+            "onefile": self.ChB_OneFile.GetValue(),
+            "hidden_imports": self.TxtCTRL_HiddenImports.GetValue(),
+            "data_file": self.TxtCTRL_AddiData.GetValue(),
+            "binaries": "",  # You can fetch from somewhere if applicable
+            "pathex": str(self.ScriptDir),
+            "excludes": ""
+        }
+
+        dlg = DG_SpecFileCreator(self, Data)
+        dlg.ShowModal()
 
     # Close app + Confirm dialog
     def OnClose(self, event):
@@ -1137,6 +1175,9 @@ class MainFrame ( wx.Frame ):
             # Close app
             self.Destroy()
 
+    # CleanUp function
+    def __del__( self ):
+        pass
 # Autosave information dialog PopUp
 class AutoSaveInfoPopUp(wx.Dialog):
 
@@ -1183,39 +1224,66 @@ class DG_HelpDialog ( wx.Dialog ):
                                          wx.VERTICAL )
 
         # TextCTRL with help text
-        self.TxtCTRL_HelpText = wx.TextCtrl( VB_HelpText.GetStaticBox(), wx.ID_ANY, _(u"PyUInstaller - Help "
-            u"Guide\n==========================\n\nThis application is a GUI front-end for PyInstaller to make creating"
-            u" standalone executables from Python scripts easier.\n\n-----------------------------------------------"
-            u"---\n1. Basic Workflow\n--------------------------------------------------\n1. Select your main Python "
-            u"script using the [Browse Script] button.\n2. Optionally choose an icon using [Browse Icon].\n3. Choose "
-            u"output folder where the executable will be saved.\n4. Optionally add:\n   - Additional hidden imports\n "
-                                                                                      u"  "
-            u"- Data files (e.g., images, configs)\n   - Additional scripts\n5. Customize build options using the"
-            u" checkboxes:\n   - One File vs. One Dir\n   - No Console, Clean Build, Debug Mode, etc.\n6. "
-            u"Click [Compile] to generate the executable.\n\n--------------------------------------------------\n2. "
-            u"Key Features\n--------------------------------------------------\n- **Presets**:\n  Save and load"
-            u" configurations for different projects.\n- **Spec File Support**:\n  Use .spec file instead of standard"
-            u" script build.\n- **Auto-Save**:\n  Automatically stores session data (can be disabled in Settings)"
-            u".\n\n--------------------------------------------------\n3. Panel Overview\n-------------------------"
-            u"-------------------------\n- **Source Panel**:\n  - Script: Main .py file\n  - Icon: Optional .ico file\n"
-            u"  - Use Additional Scripts: Include imported scripts manually\n  \n- **Output Panel**:\n  - Output "
-            u"Folder: Where final .exe is placed\n  - Hidden Imports: Include modules PyInstaller may miss\n  "
-            u"- Add-Data: Format `dest;src` (e.g., `assets;assets`)\n\n- **Controls Panel**:\n  - Build flags like"
-            u" --onedir, --onefile, --noconsole, --debug, etc.\n  - Real-time command preview at bottom\n\n- **Output"
-            u" Log**:\n  - Shows compilation output and errors\n\n- **Presets Panel**:\n  - Load, save, and manage "
-            u"build presets\n  - .spec file toggle if you want full PyInstaller control\n\n---------------------------"
-            u"-----------------------\n4. Tips & Notes\n--------------------------------------------------\n- Avoid "
-            u"using --onedir and --onefile together (mutually exclusive).\n- Same for --clean and --noupx – cannot be "
-            u"used together.\n- Ensure paths are correct (valid file/folder).\n- Script and icon must exist and be"
-            u" accessible.\n- Data folders in Add-Data must use `dest;src` format.\n\n--------------------------------"
-            u"------------------\n5. Keyboard Shortcuts\n--------------------------------------------------\n- ALT + F4"
-                                                                                      u" "
-            u": Quit\n- CTRL + T : Toggle Auto-Save\n- CTRL + H : Help\n- F5       : Compile\n\n---------------------"
-            u"-----------------------------\n6. Troubleshooting\n--------------------------------------------------\n-"
-            u" If nothing compiles, check if required paths are missing.\n- Ensure dependencies are correctly added in"
-            u" Hidden Imports.\n- Read output log for PyInstaller errors.\n\n------------------------------------------"
-            u"--------\nThank you for using PyUInstaller!"),
-            wx.DefaultPosition, wx.DefaultSize, wx.TE_CENTER|wx.TE_MULTILINE|wx.TE_READONLY|wx.TE_RICH2|wx.TE_RIGHT )
+        self.TxtCTRL_HelpText = wx.TextCtrl( VB_HelpText.GetStaticBox(), wx.ID_ANY,
+                                             _(u"PyUInstaller - Help Guide\n==========================\n\nThis "
+                                               u"application is a GUI front-end for PyInstaller to make creating "
+                                               u"standalone executables from Python scripts easier."
+                                               u"\n\n--------------------------------------------------\n1. "
+                                               u"Basic Workflow\n--------------------------------------------------\n1."
+                                               u" Select your main Python script using the [Browse Script] button.\n2. "
+                                               u"Optionally choose an icon using [Browse Icon].\n3. Choose output "
+                                               u"folder where the executable will be saved.\n4. Optionally add:\n   "
+                                               u"- Additional hidden imports\n   - Data files (e.g., images, configs)\n"
+                                               u"   - Additional scripts\n5. Customize build options using the "
+                                               u"checkboxes:\n   - One File vs. One Dir\n   - No Console, Clean Build,"
+                                               u" Debug Mode, etc.\n6. Click [Compile] to generate the executable."
+                                               u"\n\n--------------------------------------------------\n2. Key"
+                                               u" Features\n--------------------------------------------------\n-"
+                                               u" **Presets**:\n  Save and load configurations for different projects."
+                                               u"\n- **Spec File Support**:\n  Use .spec file instead of standard "
+                                               u"script build.\n- **Auto-Save**:\n  Automatically stores session data"
+                                               u" (can be disabled in Settings)."
+                                               u"\n\n--------------------------------------------------\n3. Panel "
+                                               u"Overview\n--------------------------------------------------\n- "
+                                               u"**Source Panel**:\n  - Script: Main .py file\n  - Icon: Optional "
+                                               u".ico file\n  - Use Additional Scripts: Include imported scripts"
+                                               u" manually\n  \n- **Output Panel**:\n  - Output Folder: Where final "
+                                               u".exe is placed\n  - Hidden Imports: Include modules PyInstaller may "
+                                               u"miss\n  - Add-Data: Format `src;dest` (e.g., `assets;assets`)\n\n-"
+                                               u" **Controls Panel**:\n  - Build flags like --onedir, --onefile, "
+                                               u"--noconsole, --debug, etc.\n  - Real-time command preview at bottom"
+                                               u"\n\n- **Output Log**:\n  - Shows compilation output and errors\n\n- "
+                                               u"**Presets Panel**:\n  - Load, save, and manage build presets\n  - "
+                                               u".spec file toggle if you want full PyInstaller control"
+                                               u"\n\n--------------------------------------------------\n4. "
+                                               u"Tips & Notes\n--------------------------------------------------\n- "
+                                               u"Avoid using --onedir and --onefile together (mutually exclusive).\n- "
+                                               u"Same for --clean and --noupx – cannot be used together.\n- Ensure "
+                                               u"paths are correct (valid file/folder).\n- Script and icon must exist "
+                                               u"and be accessible.\n- Data folders in Add-Data must use `src;dest` "
+                                               u"format.\n\n--------------------------------------------------\n5. "
+                                               u"Keyboard Shortcuts\n-------------------------------------------------"
+                                               u"-\n- ALT + F4 : Quit\n- CTRL + T : Toggle Auto-Save\n- CTRL + H : "
+                                               u"Help\n- F5       : Compile\n\n---------------------------------------"
+                                               u"-----------\n6. Troubleshooting\n------------------------------------"
+                                               u"--------------\n- If nothing compiles, check if required paths are "
+                                               u"missing.\n- Ensure dependencies are correctly added in Hidden Imports."
+                                               u"\n- Read output log for PyInstaller errors."
+                                               u"\n\n--------------------------------------------------\n7. Spec "
+                                               u"File Creator (Advanced)"
+                                               u"\n--------------------------------------------------\n- Use the"
+                                               u" [SpecFile Creator] button to generate a .spec file for full control"
+                                               u" over your build.\n- Fill in:\n  - Script Path: Main Python file\n  - "
+                                               u"App Name: Executable name\n  - Icon Path (optional)\n  - Additional "
+                                               u"inputs like hidden imports, binaries, data files, path exclusions, "
+                                               u"etc.\n- A live preview of the spec file is shown in the preview box."
+                                               u"\n- When ready, click **Generate** to save the .spec file anywhere.\n-"
+                                               u" You can then use this .spec file from the main window by enabling the"
+                                               u" **Use .spec file** option in the Presets panel."
+                                               u"\n\n--------------------------------------------------\nThank you "
+                                               u"for using PyUInstaller!"),
+                                             wx.DefaultPosition, wx.DefaultSize, wx.TE_CENTER|wx.TE_MULTILINE|
+                                             wx.TE_READONLY|wx.TE_RICH2|wx.TE_RIGHT )
 
         # Text CTRL Font settings
         self.TxtCTRL_HelpText.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(),
@@ -1261,6 +1329,530 @@ class DG_HelpDialog ( wx.Dialog ):
     def CloseHelpDG(self, event):
         self.EndModal(wx.ID_OK)
 
+    # CleanUp function
+    def __del__( self ):
+        pass
+
+
+# Spec file creator class
+class DG_SpecFileCreator ( wx.Dialog ):
+    def __init__(self, parent, Data=None):
+
+        # Dialog main setup
+        wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = _(u"SpecFile Creator"), pos = wx.DefaultPosition,
+                             size = wx.Size( 700,700 ), style = wx.DEFAULT_DIALOG_STYLE )
+
+
+        # Variables declaration
+        self.script_path = None
+        self.app_name = None
+        self.icon_path = None
+        self.bin_name = None
+        self.chk_console = None
+        self.bin_name = None
+        self.chk_onefile = None
+        self.hidden_imports = None
+        self.datas = None
+        self.binaries = None
+        self.pathex = None
+        self.excludes = None
+        self.preview = None
+
+        # Dialog main frame size
+        self.SetSizeHints( wx.Size( 700,700 ), wx.Size( 700,700 ) )
+
+        # Main Sizer setup
+        VB_MainSizer = wx.BoxSizer( wx.VERTICAL )
+
+        # Source WxPanel setup
+        self.WP_SourcePanel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+        VB_Source = wx.BoxSizer( wx.VERTICAL )
+
+        # Source VerticalBox sizer setup
+        VB_SourceSizer = wx.StaticBoxSizer( wx.StaticBox( self.WP_SourcePanel, wx.ID_ANY, _(u"Source") ), wx.VERTICAL )
+
+        # HorizontalBox for Script setup
+        HB_ScriptSizer = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label for Script
+        self.Txt_Script = wx.StaticText( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, _(u"Script Path:"),
+                                         wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.Txt_Script.Wrap( -1 )
+
+        # Text label add to HorizontalBox Script
+        HB_ScriptSizer.Add( self.Txt_Script, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control for script setup
+        self.TxtCTRL_Script = wx.TextCtrl( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, wx.EmptyString,
+                                           wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_ScriptSizer.Add( self.TxtCTRL_Script, 1, wx.ALL, 5 )
+
+        # Script Browse setup
+        self.Btn_Script = wx.Button( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, _(u"Browse"),
+                                     wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_ScriptSizer.Add( self.Btn_Script, 0, wx.ALL, 5 )
+
+        # Script HorizontalBox add to Source VerticalBox
+        VB_SourceSizer.Add( HB_ScriptSizer, 1, wx.EXPAND, 5 )
+
+        # HorizontalBox AppName setup
+        HB_AppName = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label AppName setup
+        self.Txt_AppName = wx.StaticText( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, _(u"App Name:"),
+                                          wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.Txt_AppName.Wrap( -1 )
+
+        # Text label add to AppName HorizontalBox
+        HB_AppName.Add( self.Txt_AppName, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control setup of AppName
+        self.TxtCTRL_AppName = wx.TextCtrl( VB_SourceSizer.GetStaticBox(), wx.ID_ANY,
+                                            wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_AppName.Add( self.TxtCTRL_AppName, 1, wx.ALL, 5 )
+
+        # AppName HorizontalBox add to Source VerticalBox
+        VB_SourceSizer.Add( HB_AppName, 1, wx.EXPAND, 5 )
+
+        # Icon HorizontalBox setup
+        HB_Icon = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label Icon setup
+        self.Txt_Icon = wx.StaticText( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, _(u"Icon Path (optional):"),
+                                       wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.Txt_Icon.Wrap( -1 )
+
+        # Text label add to Icon HorizontalBox
+        HB_Icon.Add( self.Txt_Icon, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control setup of Icon
+        self.TxtCTRL_Icon = wx.TextCtrl( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, wx.EmptyString,
+                                         wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_Icon.Add( self.TxtCTRL_Icon, 1, wx.ALL, 5 )
+
+        # Browse Icon setup for Icon
+        self.Btn_Icon = wx.Button( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, _(u"Browse"),
+                                   wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_Icon.Add( self.Btn_Icon, 0, wx.ALL, 5 )
+
+        # Icon HorizontalBox add to Source VerticalBox
+        VB_SourceSizer.Add( HB_Icon, 1, wx.EXPAND, 5 )
+
+        # BinFolder HorizontalBox setup
+        HB_BinFolder = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label of BinFolder setup
+        self.Txt_BinFolder = wx.StaticText( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, _(u"Binary Folder Name (Bin):"),
+                                            wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.Txt_BinFolder.Wrap( -1 )
+
+        # Text label add to BinFolder HorizontalBox
+        HB_BinFolder.Add( self.Txt_BinFolder, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control setup for BinFolder
+        self.TxtCTRL_BinFolder = wx.TextCtrl( VB_SourceSizer.GetStaticBox(), wx.ID_ANY, wx.EmptyString,
+                                              wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_BinFolder.Add( self.TxtCTRL_BinFolder, 1, wx.ALL, 5 )
+
+        # BinFolder HorizontalBox add to Source VerticalBox
+        VB_SourceSizer.Add( HB_BinFolder, 1, wx.EXPAND, 5 )
+
+        # Source VerticalBox add to Main Source VerticalBox
+        VB_Source.Add( VB_SourceSizer, 1, wx.EXPAND|wx.ALL, 5 )
+
+        # Source WxPanel layout and add to Main Sizer
+        self.WP_SourcePanel.SetSizer( VB_Source )
+        self.WP_SourcePanel.Layout()
+        VB_Source.Fit( self.WP_SourcePanel )
+        VB_MainSizer.Add( self.WP_SourcePanel, 1, wx.EXPAND, 5 )
+
+        # Controls WxPanel setup
+        self.WP_ControlsPanel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+        VB_Controls = wx.BoxSizer( wx.VERTICAL )
+
+        # Controls Sizer setup
+        VB_ControlsSizer = wx.StaticBoxSizer( wx.StaticBox( self.WP_ControlsPanel, wx.ID_ANY, _(u"Controls") ),
+                                              wx.VERTICAL )
+
+        # Console mode CheckBox setup
+        self.ChCB_ConsoleMode = wx.CheckBox(VB_ControlsSizer.GetStaticBox(), wx.ID_ANY, _(u"Console Mode"),
+                                            wx.DefaultPosition, wx.DefaultSize, 0)
+        VB_ControlsSizer.Add(self.ChCB_ConsoleMode, 0, wx.ALL, 5)
+
+        # OneDir CheckBox setup
+        self.ChCB_OneDir = wx.CheckBox( VB_ControlsSizer.GetStaticBox(), wx.ID_ANY, _(u"OneDir"), wx.DefaultPosition,
+                                        wx.DefaultSize, 0 )
+        VB_ControlsSizer.Add( self.ChCB_OneDir, 0, wx.ALL, 5 )
+
+        # OneFile CheckBox setup
+        self.ChCB_OneFile = wx.CheckBox( VB_ControlsSizer.GetStaticBox(), wx.ID_ANY, _(u"OneFile"), wx.DefaultPosition,
+                                         wx.DefaultSize, 0 )
+        VB_ControlsSizer.Add( self.ChCB_OneFile, 0, wx.ALL, 5 )
+
+        # Controls sizer add to Main Controls sizer
+        VB_Controls.Add( VB_ControlsSizer, 1, wx.EXPAND|wx.ALL, 5 )
+
+        # Controls WxPanel layout and add to Main Sizer
+        self.WP_ControlsPanel.SetSizer( VB_Controls )
+        self.WP_ControlsPanel.Layout()
+        VB_Controls.Fit( self.WP_ControlsPanel )
+        VB_MainSizer.Add( self.WP_ControlsPanel, 1, wx.EXPAND, 5 )
+
+        # AddiControls WxPanel setup
+        self.WP_AddiControlsPanel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+        VB_AddiControls = wx.BoxSizer( wx.VERTICAL )
+
+        # AddiControls VerticalBox setup
+        VB_AddiControlsSizer = wx.StaticBoxSizer( wx.StaticBox( self.WP_AddiControlsPanel, wx.ID_ANY,
+                                                                _(u"Additional Controls") ), wx.VERTICAL )
+
+        # HiddenImport HorizontalBox setup
+        HB_HiddenImports = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label HiddenImports setup
+        self.Txt_HiddenImports = wx.StaticText( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY,
+                                                _(u"Hidden Imports (comma-separated):"), wx.DefaultPosition,
+                                                wx.DefaultSize, 0 )
+        self.Txt_HiddenImports.Wrap( -1 )
+
+        # Text label add to HiddenImports HorizontalBox
+        HB_HiddenImports.Add( self.Txt_HiddenImports, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control setup of HiddenImports
+        self.TxtCTRL_HiddenImports = wx.TextCtrl( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY,
+                                                  wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_HiddenImports.Add( self.TxtCTRL_HiddenImports, 1, wx.ALL, 5 )
+
+        # HiddenImports HorizontalBox add to AddiControls VerticalBox
+        VB_AddiControlsSizer.Add( HB_HiddenImports, 1, wx.EXPAND, 5 )
+
+        # DataFile HorizontalBox setup
+        HB_DataFile = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label Data setup
+        self.Txt_DataFile = wx.StaticText( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY, _(u"Data File (src;dest):"),
+                                           wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.Txt_DataFile.Wrap( -1 )
+
+        # Text label add to Data HorizontalBox
+        HB_DataFile.Add( self.Txt_DataFile, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control of Data setup
+        self.TxtCTRL_DataFile = wx.TextCtrl( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY, wx.EmptyString,
+                                             wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_DataFile.Add( self.TxtCTRL_DataFile, 1, wx.ALL, 5 )
+
+        # Data file HorizontalBox add to AddiData VerticalBox
+        VB_AddiControlsSizer.Add( HB_DataFile, 1, wx.EXPAND, 5 )
+
+        # Binaries HorizontalBox setup
+        HB_Bins = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label Binaries setup
+        self.Txt_Bins = wx.StaticText( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY, _(u"Binaries (src;dest):"),
+                                       wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.Txt_Bins.Wrap( -1 )
+
+        # Text label add to Binaries HorizontalBox
+        HB_Bins.Add( self.Txt_Bins, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control Binaries setup
+        self.TxtCTRL_Bins = wx.TextCtrl( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY, wx.EmptyString,
+                                         wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_Bins.Add( self.TxtCTRL_Bins, 1, wx.ALL, 5 )
+
+        # Binaries HorizontalBox add to AddiControls VerticalBox
+        VB_AddiControlsSizer.Add( HB_Bins, 1, wx.EXPAND, 5 )
+
+        # PythonPath HorizontalBox setup
+        HB_PythonPath = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label PythonPath setup
+        self.Txt_PythonPath = wx.StaticText( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY,
+                                             _(u"Python Paths (pathex):"), wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.Txt_PythonPath.Wrap( -1 )
+
+        # PythonPath add to PythonPath HorizontalBox
+        HB_PythonPath.Add( self.Txt_PythonPath, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control PythonPath setup
+        self.TxtCTRL_PythonPath = wx.TextCtrl( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY, wx.EmptyString,
+                                               wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_PythonPath.Add( self.TxtCTRL_PythonPath, 1, wx.ALL, 5 )
+
+        # PythonPath HorizontalBox add to AddiControls VerticalBox
+        VB_AddiControlsSizer.Add( HB_PythonPath, 1, wx.EXPAND, 5 )
+
+        # ExcludeModule HorizontalBox setup
+        HB_ExcludeModule = wx.BoxSizer( wx.HORIZONTAL )
+
+        # Text label ExcludeModule setup
+        self.Txt_Exclude = wx.StaticText( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY, _(u"Exclude Modules:"),
+                                          wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.Txt_Exclude.Wrap( -1 )
+
+        # Text label add to ExcludeModule HorizontalBox
+        HB_ExcludeModule.Add( self.Txt_Exclude, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+
+        # Text Control ExcludeModule setup
+        self.TxtCTRL_Exclude = wx.TextCtrl( VB_AddiControlsSizer.GetStaticBox(), wx.ID_ANY, wx.EmptyString,
+                                            wx.DefaultPosition, wx.DefaultSize, 0 )
+        HB_ExcludeModule.Add( self.TxtCTRL_Exclude, 1, wx.ALL, 5 )
+
+        # ExcludeModule HorizontalBox add to AddiControls VerticalBox
+        VB_AddiControlsSizer.Add( HB_ExcludeModule, 1, wx.EXPAND, 5 )
+
+        # AddiControls add to MainAddiControls Sizer
+        VB_AddiControls.Add( VB_AddiControlsSizer, 1, wx.EXPAND, 5 )
+
+        # AddiControls WxPanel Layout and add to Main Sizer
+        self.WP_AddiControlsPanel.SetSizer( VB_AddiControls )
+        self.WP_AddiControlsPanel.Layout()
+        VB_AddiControls.Fit( self.WP_AddiControlsPanel )
+        VB_MainSizer.Add( self.WP_AddiControlsPanel, 1, wx.EXPAND|wx.ALL, 5 )
+
+        # Generate spec WxPanel setup
+        self.WP_GeneratePanel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+        VB_GenerateSizer = wx.BoxSizer( wx.VERTICAL )
+
+        # Generate spec Button setup
+        self.Btn_Generate = wx.Button( self.WP_GeneratePanel, wx.ID_ANY, _(u"Generate .spec File"), wx.DefaultPosition, wx.DefaultSize, 0 )
+        VB_GenerateSizer.Add( self.Btn_Generate, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
+
+        # Generate WxPanel layout and add to Main Sizer
+        self.WP_GeneratePanel.SetSizer( VB_GenerateSizer )
+        self.WP_GeneratePanel.Layout()
+        VB_GenerateSizer.Fit( self.WP_GeneratePanel )
+        VB_MainSizer.Add( self.WP_GeneratePanel, 0, wx.EXPAND, 5 )
+
+        # Preview spec WxPanel setup
+        self.WP_SpecPreviewPanel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+        VB_SpecSizer = wx.BoxSizer( wx.VERTICAL )
+
+        # PreviewSpec VerticalBox setup
+        VB_SpecPreview = wx.StaticBoxSizer( wx.StaticBox( self.WP_SpecPreviewPanel, wx.ID_ANY, _(u"SpecFile Preview")
+                                                          ), wx.VERTICAL )
+
+        # PreviewSpec Text Controls setup in read only mode
+        self.TxtCTRL_SpecPreview = wx.TextCtrl( VB_SpecPreview.GetStaticBox(), wx.ID_ANY, wx.EmptyString,
+                                                wx.DefaultPosition, wx.DefaultSize,
+                                                wx.TE_MULTILINE|wx.TE_READONLY|wx.TE_RICH|wx.TE_RICH2 )
+        VB_SpecPreview.Add( self.TxtCTRL_SpecPreview, 1, wx.ALL|wx.EXPAND, 5 )
+
+        # SpecFile Preview VerticalBox add to Main Spec VerticalBox
+        VB_SpecSizer.Add( VB_SpecPreview, 1, wx.EXPAND|wx.ALL, 5 )
+
+        # PreviewSpec WxPanel layout and add to Main Sizer
+        self.WP_SpecPreviewPanel.SetSizer( VB_SpecSizer )
+        self.WP_SpecPreviewPanel.Layout()
+        VB_SpecSizer.Fit( self.WP_SpecPreviewPanel )
+        VB_MainSizer.Add( self.WP_SpecPreviewPanel, 1, wx.EXPAND, 5 )
+
+        # Main frame layout and center
+        self.SetSizer( VB_MainSizer )
+        self.Layout()
+        self.Centre( wx.BOTH )
+
+        # Bind Events for buttons
+        self.Btn_Script.Bind(wx.EVT_BUTTON, self.OnBrowseScript)
+        self.Btn_Icon.Bind(wx.EVT_BUTTON, self.OnBrowseIcon)
+        self.Btn_Generate.Bind(wx.EVT_BUTTON, self.GenerateSpec)
+
+        # Bind Events for Text fields
+        self.TxtCTRL_Script.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+        self.TxtCTRL_AppName.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+        self.TxtCTRL_Icon.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+        self.TxtCTRL_BinFolder.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+        self.TxtCTRL_HiddenImports.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+        self.TxtCTRL_DataFile.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+        self.TxtCTRL_Bins.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+        self.TxtCTRL_PythonPath.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+        self.TxtCTRL_Exclude.Bind(wx.EVT_TEXT, self.OnFormUpdated)
+
+        # Bind Events for CheckBoxes
+        self.ChCB_OneFile.Bind(wx.EVT_CHECKBOX, self.EnforceCheckboxRules)
+        self.ChCB_OneDir.Bind(wx.EVT_CHECKBOX, self.EnforceCheckboxRules)
+        self.ChCB_ConsoleMode.Bind(wx.EVT_CHECKBOX, self.EnforceCheckboxRules)
+
+        # Base Values fill for our Data so we don't get errors
+        self.script_path = self.TxtCTRL_Script                              # Script value
+        self.app_name = self.TxtCTRL_AppName                                # App name value
+        self.icon_path = self.TxtCTRL_Icon                                  # Icon value
+        self.bin_name = self.TxtCTRL_BinFolder                              # BinFolder value
+        self.chk_console = self.ChCB_ConsoleMode                            # ConsoleMode checkbox value
+        self.chk_onedir = self.ChCB_OneDir                                  # OneDir checkbox value
+        self.chk_onefile = self.ChCB_OneFile                                # OneFile checkbox value
+        self.hidden_imports = self.TxtCTRL_HiddenImports                    # HiddenImport value
+        self.datas = self.TxtCTRL_DataFile                                  # DataFiles value
+        self.binaries = self.TxtCTRL_Bins                                   # Binaries value
+        self.pathex = self.TxtCTRL_PythonPath                               # PythonPath value
+        self.excludes = self.TxtCTRL_Exclude                                # Excludes value
+
+        # If data was passed, populate fields
+        if Data:
+            self.SetInitialValues(Data)
+
+    # Set initial values for our Data from Main app
+    def SetInitialValues(self, Data):
+        self.TxtCTRL_Script.SetValue(Data.get("script", ""))                    # Script value
+        self.TxtCTRL_AppName.SetValue(Data.get("app_name", ""))                 # App name value
+        self.TxtCTRL_Icon.SetValue(Data.get("icon", ""))                        # Icon value
+        self.TxtCTRL_BinFolder.SetValue(Data.get("bin_folder", "bin"))          # BinFolder value
+        self.ChCB_ConsoleMode.SetValue(Data.get("console", False))              # ConsoleMode checkbox value
+        self.ChCB_OneDir.SetValue(Data.get("onedir", False))                    # OneDir checkbox value
+        self.ChCB_OneFile.SetValue(Data.get("onefile", False))                  # OneFile checkbox value
+        self.TxtCTRL_HiddenImports.SetValue(Data.get("hidden_imports", ""))     # HiddenImport value
+        self.TxtCTRL_DataFile.SetValue(Data.get("data_file", ""))               # DataFiles value
+        self.TxtCTRL_Bins.SetValue(Data.get("binaries", ""))                    # Binaries value
+        self.TxtCTRL_PythonPath.SetValue(Data.get("pathex", ""))                # PythonPath value
+        self.TxtCTRL_Exclude.SetValue(Data.get("excludes", ""))                 # Excludes value
+
+    # Prevent OneFile or OneDir checkboxes to be enabled together
+    def EnforceCheckboxRules(self, event=None):
+        if self.ChCB_OneFile.GetValue() and self.ChCB_OneDir.GetValue():
+            wx.MessageBox("'One Dir' or 'One File' flags can't be enabled together.",
+                          "Wrong combination of flags has been selected",
+                          wx.ICON_WARNING)
+            # Uncheck the one that was *just* checked
+            if event.GetEventObject() == self.ChCB_OneFile:
+                self.ChCB_OneDir.SetValue(False)
+            else:
+                self.ChCB_OneFile.SetValue(False)
+
+        # Console mode logic - just pass
+        if self.ChCB_ConsoleMode.GetValue():
+            pass
+
+    # Script browse file dialog
+    def OnBrowseScript(self, event):
+        with wx.FileDialog(self, "Select script", wildcard="Python files (*.py)|*.py") as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                self.TxtCTRL_Script.SetValue(dlg.GetPath())
+
+    # Icon browse file dialog
+    def OnBrowseIcon(self, event):
+        with wx.FileDialog(self, "Select icon", wildcard="Icon files (*.ico)|*.ico") as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                self.TxtCTRL_Icon.SetValue(dlg.GetPath())
+
+    # Update spec file preview Text Control
+    def OnFormUpdated(self, event):
+        spec = self.GenerateSpecText()
+        self.TxtCTRL_SpecPreview.SetValue(spec)
+
+    # Generate spec file text so we can use it for generation
+    def GenerateSpecText(self):
+        from pprint import pformat
+
+        def parse_list(input_text):
+            return [item.strip() for item in input_text.split(',') if item.strip()]
+
+        def parse_tuple_list(input_text):
+            return [tuple(item.split(';')) for item in input_text.split(',') if ';' in item]
+
+        # Get main values from fields
+        script = self.script_path.GetValue()
+        app_name = self.app_name.GetValue() or "app"
+        icon = self.icon_path.GetValue() or None
+        dll_folder = self.bin_name.GetValue() or f"{app_name}_main"
+        console = self.chk_console.GetValue()
+        hidden_imports = parse_list(self.hidden_imports.GetValue())
+        datas = parse_tuple_list(self.datas.GetValue())
+        binaries = parse_tuple_list(self.binaries.GetValue())
+        pathex = parse_list(self.pathex.GetValue())
+        excludes = parse_list(self.excludes.GetValue())
+
+        # Get Icon for our app
+        icon_line = f"icon={repr(icon)}," if icon else ""
+
+    # Create whole spec file text
+        return f"""
+    # -*- mode: python ; coding: utf-8 -*-
+    block_cipher = None
+    
+    a = Analysis(
+        [{repr(script)}],
+        pathex={pformat(pathex)},
+        binaries={pformat(binaries)},
+        datas={pformat(datas)},
+        hiddenimports={pformat(hidden_imports)},
+        hookspath=[],
+        runtime_hooks=[],
+        excludes={pformat(excludes)},
+        win_no_prefer_redirects=False,
+        win_private_assemblies=False,
+        cipher=block_cipher,
+    )
+
+    pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+    exe = EXE(
+        pyz,
+        a,
+        name={repr(app_name)},
+        console={console},
+        {icon_line}
+    )
+
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name={repr(dll_folder)}
+    )
+    """.strip()
+
+    # Generate spec file from Data we get from main app or from it been filled by hand
+    def GenerateSpec(self, event=None):
+
+        spec = self.GenerateSpecText()
+        self.TxtCTRL_SpecPreview.SetValue(spec)     # Show spec file preview in TextControl field
+
+        # Check for script path as it is mandatory for spec to be created
+        script = self.script_path.GetValue()
+        if not script:
+            wx.MessageBox("Script path is required to save the .spec file.", "Missing Data",
+                          wx.ICON_WARNING)
+            return
+
+        # Get default name for our app from original script
+        default_name = os.path.splitext(os.path.basename(script))[0] + ".spec"
+
+        # Get app folder where your python script is located
+        app_folder = os.path.dirname(os.path.abspath(__file__))
+        desired_folder = os.path.join(app_folder, "Spec")
+
+        # Make sure the folder exists (optional)
+        if not os.path.exists(desired_folder):
+            os.makedirs(desired_folder)
+
+        # Save spec with file dialog into App\Spec folder with app name
+        with wx.FileDialog(
+                self,
+                "Save .spec file",
+                defaultDir=desired_folder,
+                wildcard="Spec files (*.spec)|*.spec",
+                defaultFile=default_name,
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
+        ) as dlg:
+
+            if dlg.ShowModal() == wx.ID_OK:
+                spec_file_path = dlg.GetPath()
+                try:
+                    with open(spec_file_path, "w") as f:
+                        f.write(spec)
+                    wx.MessageBox(f"Spec file saved to:\n{spec_file_path}", "Successfully saved",
+                                  wx.OK | wx.ICON_INFORMATION)
+                except Exception as e:
+                    wx.MessageBox(f"Failed to save file:\n{str(e)}", "Error", wx.OK | wx.ICON_ERROR)
+
+    # CleanUp function
+    def __del__( self ):
+        pass
 
 # Main App loop
 app = wx.App(False)
